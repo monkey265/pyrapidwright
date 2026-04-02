@@ -1,0 +1,7 @@
+*.edf
+*.dcp
+*.tcl
+rapidwright/
+.ila/
+.Xil/
+__pycache__

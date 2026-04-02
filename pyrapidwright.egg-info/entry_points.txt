@@ -1,0 +1,3 @@
+[console_scripts]
+pyrapidwright = pyrapidwright.cli:main
+rapidwright = pyrapidwright.cli:main
