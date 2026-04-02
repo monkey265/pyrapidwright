@@ -5,3 +5,4 @@ rapidwright/
 .ila/
 .Xil/
 __pycache__
+pyrapidwright.egg-info/

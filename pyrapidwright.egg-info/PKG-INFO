@@ -1,5 +1,0 @@
-Metadata-Version: 2.4
-Name: pyrapidwright
-Version: 0.1.0
-Summary: A boilerplate for RapidWright-based ILA insertion in DCPs.
-Requires-Dist: jpype1>=1.4.0
