@@ -1,9 +1,7 @@
-import os
-import sys
 import re
 import fnmatch
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
 
 def select_nets_cli(design):
     """Interactive CLI loop to select nets from the design."""
@@ -57,7 +55,7 @@ def select_nets_cli(design):
             print(f" [+] Added {added_count} nets.")
         else:
             # Search
-            results = [i for i, n in enumerate(nets) if val in str(n.getName())]
+            results = [i for i, n in enumerate(nets) if val.lower() in str(n.getName()).lower()]
             if not results:
                 print(f" [!] No nets matching '{val}' found.")
             else:
@@ -83,18 +81,13 @@ def select_nets_cli(design):
     return [nets[i].getName() for i in selected_indices]
 
 class NetSelectorGUI:
-    def __init__(self, nets, root=None):
-        if root is None:
-            self.root = tk.Tk()
-            self.own_root = True
-        else:
-            self.root = root
-            self.own_root = False
-            
+    def __init__(self, nets):
+        self.root = tk.Tk()
         self.root.title("pyrapidwright ILA Net Selection")
         self.root.geometry("800x600")
         
-        self.all_nets = nets
+        self.all_names = [str(n.getName()) for n in nets]  # convert Java strings once, not per keystroke
+        self._pending_filter = None
         self.selected_map = {} # net_name -> bool
         self.final_selection = []
         
@@ -109,8 +102,7 @@ class NetSelectorGUI:
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f'{width}x{height}+{x}+{y}')
         
-        if self.own_root:
-            self.root.mainloop()
+        self.root.mainloop()
 
     def _setup_style(self):
         style = ttk.Style()
@@ -169,11 +161,10 @@ class NetSelectorGUI:
         for item in self.tree.get_children():
             self.tree.delete(item)
             
-        query = self.filter_var.get()
+        query = self.filter_var.get().lower()
         count = 0
-        for net in self.all_nets:
-            name = str(net.getName())
-            if query in name:
+        for name in self.all_names:
+            if query in name.lower():
                 status = "[X]" if self.selected_map.get(name, False) else "[ ]"
                 self.tree.insert("", tk.END, values=(name, status))
                 count += 1
@@ -182,7 +173,10 @@ class NetSelectorGUI:
                     break
 
     def _on_filter_change(self, *args):
-        self._update_tree()
+        # Rebuild once typing pauses, not on every keystroke
+        if self._pending_filter:
+            self.root.after_cancel(self._pending_filter)
+        self._pending_filter = self.root.after(200, self._update_tree)
 
     def _on_toggle_selected(self):
         selection = self.tree.selection()
@@ -212,10 +206,10 @@ class NetSelectorGUI:
         self.final_selection = [name for name, sel in self.selected_map.items() if sel]
         self.root.destroy()
 
-def select_nets_gui(design, root=None):
+def select_nets_gui(design):
     """Launches the GUI for net selection."""
     nets = design.get_all_nets()
-    gui = NetSelectorGUI(nets, root=root)
+    gui = NetSelectorGUI(nets)
     return gui.final_selection
 
 def select_nets(design, nets_hint=None, gui=False):
@@ -240,10 +234,8 @@ def select_clock(design, clk_net_hint=None):
     print("Clock Selection")
     print("-"*20)
     print("RapidWright needs a clock for the ILA.")
-    print("Common clocks often contain 'clk' or 'BUFG'.")
     
-    nets = design.get_all_nets()
-    clk_candidates = [str(n.getName()) for n in nets if 'clk' in str(n.getName()).lower() or 'bufg' in str(n.getName()).lower()]
+    clk_candidates = get_clock_nets(design)
     
     if clk_candidates:
         print("\nSuggested clocks:")
@@ -284,17 +276,23 @@ def search_nets(design, pattern, regex=False):
 
 def get_clock_nets(design):
     """
-    Identifies potential clock nets in the design.
-    Returns a list of net names likely to be clocks.
+    Returns the names of nets driven by a global clock buffer (BUFG*).
+    If there are none (e.g. an out-of-context design), falls back to nets named like clocks.
     """
-    nets = design.get_all_nets()
-    clocks = []
-    for n in nets:
-        name = str(n.getName())
-        # Heuristic: search for 'clk', 'bufg', 'clock' or check for global clock buffer drivers
-        if any(x in name.lower() for x in ['clk', 'bufg', 'clock']):
-            clocks.append(name)
-    return clocks
+    from com.xilinx.rapidwright.edif import EDIFHierNet
+
+    netlist = design.netlist
+    clocks = set()
+    for inst in netlist.getAllLeafHierCellInstances():
+        if str(inst.getCellType().getName()).startswith("BUFG"):
+            for p in inst.getInst().getPortInsts():
+                if p.isOutput() and p.getNet() is not None:
+                    net = netlist.getParentNet(EDIFHierNet(inst.getParent(), p.getNet()))
+                    clocks.add(str(net.getHierarchicalNetName()))
+    if clocks:
+        return sorted(clocks)
+    return [n for n in (str(net.getName()) for net in design.get_all_nets())
+            if any(x in n.lower() for x in ('clk', 'clock', 'bufg'))]
 
 def report_resource_usage(design):
     """
@@ -315,15 +313,15 @@ def report_resource_usage(design):
     for inst in netlist.getAllLeafCellInstances():
         type_name = str(inst.getCellType().getName()).upper()
         
-        if "LUT" in type_name:
+        if type_name.startswith("LUT"):
             counts["LUTs"] += 1
-        elif type_name.startswith("FD") or "REG" in type_name:
+        elif type_name.startswith("FD"):
             counts["Registers"] += 1
-        elif "BRAM" in type_name or "FIFO" in type_name or "RAMB" in type_name:
+        elif type_name.startswith(("RAMB", "FIFO")):
             counts["BRAMs"] += 1
-        elif "DSP" in type_name:
+        elif type_name.startswith("DSP"):
             counts["DSPs"] += 1
-        elif "CARRY" in type_name:
+        elif type_name.startswith("CARRY"):
             counts["Carry"] += 1
         else:
             counts["Others"] += 1

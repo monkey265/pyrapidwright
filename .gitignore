@@ -6,3 +6,4 @@ rapidwright/
 .Xil/
 __pycache__
 pyrapidwright.egg-info/
+.venv/

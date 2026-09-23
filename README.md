@@ -14,7 +14,12 @@ bash install_rapidwright.sh
 ```
 
 ### 2. Install Python Package
-Install in editable mode to register the unified `pyrapidwright` command:
+With [uv](https://docs.astral.sh/uv/) (creates `.venv` from `uv.lock`):
+```bash
+uv sync
+uv run pyrapidwright report <dcp_file>
+```
+Or with pip, in editable mode:
 ```bash
 pip install -e .
 ```
@@ -30,7 +35,7 @@ pyrapidwright DesignExplorer
 # Run Python Analysis Subcommands
 pyrapidwright report <dcp_file>
 pyrapidwright find <dcp_file> -p "*axi*"
-pyrapidwright add-ila <dcp_file>
+pyrapidwright add-ila <dcp_file>          # add --gui for the net selector window
 ```
 
 ## Features

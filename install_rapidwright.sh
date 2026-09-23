@@ -9,6 +9,9 @@ echo "=============================================="
 echo "    RapidWright Installation Script"
 echo "=============================================="
 
+command -v java >/dev/null || { echo "[!] Error: java not found. RapidWright needs Java 11+."; exit 1; }
+command -v vivado >/dev/null || echo "[!] Warning: vivado not on PATH. add-ila needs it to generate the ILA core."
+
 # 1. Clone
 if [ -d "$INSTALL_DIR" ]; then
     echo "[*] RapidWright directory already exists at $INSTALL_DIR"

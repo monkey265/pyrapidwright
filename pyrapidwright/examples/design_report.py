@@ -1,17 +1,12 @@
-import sys
 import argparse
-from pathlib import Path
 
 from pyrapidwright.design_util import RWDesign
-from pyrapidwright import setup_rw
 from pyrapidwright.analysis import report_resource_usage, get_clock_nets
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a report for a Xilinx DCP design.")
     parser.add_argument("dcp", help="Input DCP file")
     args = parser.parse_args()
-    
-    setup_rw()
     
     print(f"[*] Loading design: {args.dcp}...\n")
     design = RWDesign(args.dcp)

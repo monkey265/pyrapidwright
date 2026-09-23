@@ -1,9 +1,6 @@
-import sys
 import argparse
-from pathlib import Path
 
 from pyrapidwright.design_util import RWDesign
-from pyrapidwright import setup_rw
 from pyrapidwright.analysis import search_nets
 
 def main():
@@ -17,8 +14,6 @@ def main():
     
     if not args.pattern and not args.inspect:
         parser.error("Either --pattern or --inspect must be provided.")
-    
-    setup_rw()
     
     print(f"[*] Loading design: {args.dcp}...")
     design = RWDesign(args.dcp)
